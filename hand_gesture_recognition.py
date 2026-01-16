@@ -1,9 +1,5 @@
-"""
-Real-time Hand Gesture Recognition System - Patched for Python 3.13
-Uses MediaPipe with compatibility patch for 21 landmark detection
-"""
+""" Hand Gesture Recognition System """
 
-# Apply compatibility patch FIRST before any other imports
 import mediapipe_patch
 
 import cv2
@@ -12,17 +8,12 @@ import time
 from collections import deque
 import urllib.request
 import os
-
-# Import MediaPipe after patch
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 
 class HandGestureRecognizer:
-    """Main class for hand gesture recognition with 21 landmarks"""
-    
-    # Hand landmark indices
     WRIST = 0
     THUMB_CMC = 1
     THUMB_MCP = 2
@@ -45,7 +36,6 @@ class HandGestureRecognizer:
     PINKY_DIP = 19
     PINKY_TIP = 20
     
-    # Hand connections for drawing
     HAND_CONNECTIONS = [
         # Thumb
         (0, 1), (1, 2), (2, 3), (3, 4),
@@ -61,7 +51,6 @@ class HandGestureRecognizer:
         (5, 9), (9, 13), (13, 17)
     ]
     
-    # Color schemes for different gestures
     GESTURE_COLORS = {
         'Open Palm': (0, 255, 0),      # Green
         'Fist': (0, 0, 255),            # Red
@@ -77,7 +66,6 @@ class HandGestureRecognizer:
         """Initialize the recognizer"""
         print("Initializing Hand Gesture Recognizer...")
         
-        # Download model if needed
         self.model_path = 'hand_landmarker.task'
         if not os.path.exists(self.model_path):
             print("Downloading hand landmarker model...")
@@ -85,7 +73,6 @@ class HandGestureRecognizer:
             urllib.request.urlretrieve(model_url, self.model_path)
             print("Model downloaded!")
         
-        # Create HandLandmarker
         try:
             base_options = python.BaseOptions(model_asset_path=self.model_path)
             options = vision.HandLandmarkerOptions(
@@ -100,15 +87,12 @@ class HandGestureRecognizer:
         except Exception as e:
             print(f"Error initializing detector: {e}")
             raise
-        
-        # Gesture history
+
         self.gesture_history = [deque(maxlen=5), deque(maxlen=5)]
         
-        # FPS tracking
         self.prev_time = 0
         self.fps = 0
-        
-        # Gesture to action mapping
+
         self.gesture_actions = {
             'Fist': 'Command: Stop',
             'Open Palm': 'Command: Activate',
@@ -134,9 +118,7 @@ class HandGestureRecognizer:
         """Check if thumb is extended (horizontal)"""
         thumb_tip = landmarks[4]
         thumb_ip = landmarks[3]
-        
-        # For Right hand: thumb extended means tip is to the RIGHT (higher x)
-        # For Left hand: thumb extended means tip is to the LEFT (lower x)
+
         if hand_type == 'Right':
             return thumb_tip[0] > thumb_ip[0]
         else:
@@ -200,51 +182,44 @@ class HandGestureRecognizer:
     def draw_landmarks(self, frame, landmarks, gesture, hand_idx=0):
         """Draw 21 landmarks and connections with gesture-specific colors"""
         h, w = frame.shape[:2]
-        
-        # Get color for this gesture
+    
         color = self.GESTURE_COLORS.get(gesture, (255, 255, 255))
         
-        # Draw connections with thicker lines
         for connection in self.HAND_CONNECTIONS:
             start_idx, end_idx = connection
             if start_idx < len(landmarks) and end_idx < len(landmarks):
                 start_point = landmarks[start_idx]
                 end_point = landmarks[end_idx]
                 cv2.line(frame, start_point, end_point, color, 3)
-        
-        # Draw landmarks (circles) with white outlines
+    
         for i, point in enumerate(landmarks):
             # Larger circles for fingertips and wrist
             if i in [0, 4, 8, 12, 16, 20]:
                 radius = 9
-                # White outline
+                
                 cv2.circle(frame, point, radius + 3, (255, 255, 255), 3)
-                # Colored fill
                 cv2.circle(frame, point, radius, color, -1)
             else:
                 radius = 6
-                # White outline
+
                 cv2.circle(frame, point, radius + 2, (255, 255, 255), 2)
-                # Colored fill
+
                 cv2.circle(frame, point, radius, color, -1)
     
     def draw_info(self, frame, gestures, fps):
         """Draw UI information"""
-        # Draw FPS
+        
         cv2.putText(frame, f'FPS: {fps}', (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
-        # Draw gestures - always show all detected hands
         y_offset = 70
         for i, gesture in enumerate(gestures):
             color = self.GESTURE_COLORS.get(gesture, (255, 255, 255))
             
-            # Draw gesture name (always, even if Unknown)
             cv2.putText(frame, f'Hand {i+1}: {gesture}',
                         (10, y_offset), cv2.FONT_HERSHEY_SIMPLEX,
                         0.8, color, 2)
             
-            # Draw action if available
             if gesture in self.gesture_actions:
                 cv2.putText(frame, self.gesture_actions[gesture],
                             (10, y_offset + 30), cv2.FONT_HERSHEY_SIMPLEX,
@@ -291,10 +266,8 @@ class HandGestureRecognizer:
                 stable_gesture = self.get_stable_gesture(gesture, hand_idx)
                 gestures.append(stable_gesture)
                 
-                # Draw landmarks with gesture-specific color
                 self.draw_landmarks(frame, landmarks, stable_gesture, hand_idx)
                 
-                # Print to console for both hands
                 if stable_gesture in self.gesture_actions:
                     print(f"[Hand {hand_idx+1} - {hand_label}] {stable_gesture} -> {self.gesture_actions[stable_gesture]}")
         
@@ -331,10 +304,8 @@ class HandGestureRecognizer:
                 print("Error: Failed to capture frame")
                 break
             
-            # Process frame
             processed_frame, gestures = self.process_frame(frame)
             
-            # Display
             cv2.imshow('Hand Gesture Recognition - 21 Landmarks', processed_frame)
             
             # Handle keys
@@ -349,7 +320,6 @@ class HandGestureRecognizer:
 
 
 def main():
-    """Main function"""
     try:
         recognizer = HandGestureRecognizer(max_hands=2, detection_confidence=0.7)
         recognizer.run(camera_index=0)
